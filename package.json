@@ -1,0 +1,26 @@
+{
+  "name": "sanxipay-api-docs",
+  "version": "1.0.0",
+  "description": "三希智付 API Documentation",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "docs:dev": "vitepress dev docs",
+    "docs:build": "vitepress build docs",
+    "docs:preview": "vitepress preview docs"
+  },
+  "keywords": [
+    "api",
+    "documentation",
+    "vitepress",
+    "sanxipay"
+  ],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "vitepress": "^1.6.3"
+  },
+  "dependencies": {
+    "crypto-js": "^4.2.0"
+  }
+}

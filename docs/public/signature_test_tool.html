@@ -1,0 +1,824 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>三希智付签名测试工具</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+            backdrop-filter: blur(10px);
+        }
+
+        .header {
+            background: linear-gradient(135deg, #4f46e5, #7c3aed);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            font-weight: 700;
+        }
+
+        .header p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+
+        .content {
+            padding: 40px;
+        }
+
+        .form-section {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            margin-bottom: 30px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.08);
+            border: 1px solid #e5e7eb;
+        }
+
+        .form-section h2 {
+            color: #374151;
+            margin-bottom: 20px;
+            font-size: 1.5rem;
+            font-weight: 600;
+            border-bottom: 2px solid #4f46e5;
+            padding-bottom: 10px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #374151;
+            font-size: 0.95rem;
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid #e5e7eb;
+            border-radius: 10px;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+            background: #f9fafb;
+        }
+
+        .form-control:focus {
+            outline: none;
+            border-color: #4f46e5;
+            background: white;
+            box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        @media (max-width: 768px) {
+            .form-row {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .btn {
+            padding: 12px 30px;
+            border: none;
+            border-radius: 10px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #4f46e5, #7c3aed);
+            color: white;
+            box-shadow: 0 4px 15px rgba(79, 70, 229, 0.4);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(79, 70, 229, 0.4);
+        }
+
+        .btn-secondary {
+            background: #6b7280;
+            color: white;
+            margin-left: 10px;
+        }
+
+        .btn-secondary:hover {
+            background: #4b5563;
+            transform: translateY(-1px);
+        }
+
+        .btn-success {
+            background: #10b981;
+            color: white;
+            margin-left: 10px;
+        }
+
+        .btn-success:hover {
+            background: #059669;
+            transform: translateY(-1px);
+        }
+
+        .result-section {
+            background: #f8fafc;
+            border: 2px solid #e2e8f0;
+            border-radius: 15px;
+            padding: 25px;
+            margin-top: 20px;
+        }
+
+        .result-section h3 {
+            color: #1e293b;
+            margin-bottom: 15px;
+            font-size: 1.3rem;
+        }
+
+        .result-item {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            border-left: 4px solid #4f46e5;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        }
+
+        .result-item label {
+            font-weight: 600;
+            color: #374151;
+            display: block;
+            margin-bottom: 5px;
+        }
+
+        .result-value {
+            font-family: 'Courier New', monospace;
+            background: #f1f5f9;
+            padding: 10px;
+            border-radius: 6px;
+            word-break: break-all;
+            font-size: 0.9rem;
+            border: 1px solid #cbd5e1;
+        }
+
+        .steps-section {
+            background: #fef3c7;
+            border: 2px solid #fbbf24;
+            border-radius: 15px;
+            padding: 25px;
+            margin-top: 20px;
+        }
+
+        .steps-section h3 {
+            color: #92400e;
+            margin-bottom: 15px;
+        }
+
+        .step {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            border-left: 4px solid #fbbf24;
+        }
+
+        .step-title {
+            font-weight: 600;
+            color: #92400e;
+            margin-bottom: 5px;
+        }
+
+        .step-content {
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+            color: #451a03;
+            background: #fffbeb;
+            padding: 8px;
+            border-radius: 4px;
+            word-break: break-all;
+        }
+
+        .error {
+            background: #fef2f2;
+            border: 2px solid #fca5a5;
+            color: #dc2626;
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: 10px;
+        }
+
+        .success {
+            background: #f0fdf4;
+            border: 2px solid #86efac;
+            color: #16a34a;
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: 10px;
+        }
+
+        .example-section {
+            background: #eff6ff;
+            border: 2px solid #3b82f6;
+            border-radius: 15px;
+            padding: 25px;
+        }
+
+        .example-section h3 {
+            color: #1e40af;
+            margin-bottom: 15px;
+        }
+
+        @media (max-width: 768px) {
+            .content {
+                padding: 20px;
+            }
+            
+            .header h1 {
+                font-size: 2rem;
+            }
+            
+            .btn {
+                width: 100%;
+                margin-bottom: 10px;
+                margin-left: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>💳 三希智付支付签名工具</h1>
+            <p>基于MD5签名算法的支付接口签名生成和验证工具</p>
+        </div>
+
+        <div class="content">
+            <!-- 示例数据区域 -->
+            <div class="example-section">
+                <h3>📝 快速导入数据</h3>
+                <div style="margin-bottom: 15px;">
+                    <button type="button" class="btn btn-success" onclick="loadExample()">
+                        🚀 加载官方示例
+                    </button>
+                    <button type="button" class="btn btn-primary" onclick="toggleJsonImport()" style="margin-left: 10px;">
+                        📋 JSON导入
+                    </button>
+                </div>
+                
+                <div id="jsonImportSection" style="display: none; margin-top: 20px;">
+                    <label for="jsonInput" style="display: block; margin-bottom: 8px; font-weight: 600; color: #1e40af;">
+                        粘贴JSON数据：
+                    </label>
+                    <textarea id="jsonInput" class="form-control" style="min-height: 200px; font-family: 'Courier New', monospace;" 
+                              placeholder='粘贴JSON数据，例如:
+{
+    "version": "1.0",
+    "signType": "MD5",
+    "reqTime": "2023-10-19T12:00:00Z",
+    "mchNo": "M1748248715",
+    "appId": "6834288be4b08df6d75dbd00",
+    "mchOrderNo": "ORDER20250111-02",
+    "wayCode": "WX_LITE",
+    "amount": 1,
+    "currency": "CNY",
+    "clientIp": "192.168.1.1",
+    "subject": "商品标题1",
+    "body": "商品描述信息",
+    "notifyUrl": "http://example.com/notify",
+    "returnUrl": "http://example.com/return",
+    "expiredTime": 3600,
+    "channelExtra": "{\"Openid\": \"xxx\"}",
+    "extParam": "{}",
+    "divisionMode": 0
+}'></textarea>
+                    <div style="margin-top: 10px;">
+                        <button type="button" class="btn btn-primary" onclick="importFromJson()">
+                            ✨ 导入数据
+                        </button>
+                        <button type="button" class="btn btn-secondary" onclick="cleanJsonFormat()" style="margin-left: 10px;">
+                            🧹 清理JSON格式
+                        </button>
+                    </div>
+                </div>
+                
+                <p style="margin-top: 10px; color: #1e40af; font-size: 0.9rem;">
+                    可以加载官方示例验证算法，或直接粘贴JSON数据快速填充表单
+                </p>
+            </div>
+
+            <div class="form-section">
+                <h2>🔐 签名参数配置</h2>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="platId">平台ID (platId) *</label>
+                        <input type="text" id="platId" class="form-control" placeholder="例如: 1000" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="privateKey">私钥 (key) *</label>
+                        <input type="text" id="privateKey" class="form-control" placeholder="例如: EWEFD123RGSRETYDFNGFGFGSHDFGH" required>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="mchOrderNo">商户订单号 (mchOrderNo)</label>
+                        <input type="text" id="mchOrderNo" class="form-control" placeholder="例如: P0123456789101">
+                    </div>
+                    <div class="form-group">
+                        <label for="amount">交易金额-分 (amount)</label>
+                        <input type="number" id="amount" class="form-control" placeholder="例如: 10000">
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="mchNo">商户号 (mchNo)</label>
+                        <input type="text" id="mchNo" class="form-control" placeholder="例如: M1748248715">
+                    </div>
+                    <div class="form-group">
+                        <label for="appId">应用ID (appId)</label>
+                        <input type="text" id="appId" class="form-control" placeholder="例如: 6834288be4b08df6d75dbd00">
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="wayCode">支付方式 (wayCode)</label>
+                        <input type="text" id="wayCode" class="form-control" placeholder="例如: WX_LITE">
+                    </div>
+                    <div class="form-group">
+                        <label for="currency">货币类型 (currency)</label>
+                        <input type="text" id="currency" class="form-control" placeholder="例如: CNY" value="CNY">
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="clientIp">客户端IP (clientIp)</label>
+                        <input type="text" id="clientIp" class="form-control" placeholder="例如: 192.168.0.111">
+                    </div>
+                    <div class="form-group">
+                        <label for="version">版本号 (version)</label>
+                        <input type="text" id="version" class="form-control" placeholder="例如: 1.0" value="1.0">
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="subject">商品标题 (subject)</label>
+                        <input type="text" id="subject" class="form-control" placeholder="例如: 商品标题1">
+                    </div>
+                    <div class="form-group">
+                        <label for="body">商品描述 (body)</label>
+                        <input type="text" id="body" class="form-control" placeholder="例如: 商品描述信息">
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="returnUrl">返回地址 (returnUrl)</label>
+                        <input type="url" id="returnUrl" class="form-control" placeholder="例如: https://www.baidu.com">
+                    </div>
+                    <div class="form-group">
+                        <label for="notifyUrl">通知地址 (notifyUrl)</label>
+                        <input type="url" id="notifyUrl" class="form-control" placeholder="例如: https://www.baidu.com">
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="expiredTime">过期时间-秒 (expiredTime)</label>
+                        <input type="number" id="expiredTime" class="form-control" placeholder="例如: 3600">
+                    </div>
+                    <div class="form-group">
+                        <label for="divisionMode">分账模式 (divisionMode)</label>
+                        <input type="number" id="divisionMode" class="form-control" placeholder="例如: 0">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="channelExtra">渠道扩展参数 (channelExtra)</label>
+                    <input type="text" id="channelExtra" class="form-control" placeholder='例如: {"Openid": "oimSM7dQP4OXVU2GIaBeoxp0ZMOI"}'>
+                </div>
+
+                <div class="form-group">
+                    <label for="extParam">扩展参数 (extParam)</label>
+                    <input type="text" id="extParam" class="form-control" placeholder="例如: {}">
+                </div>
+
+                <div class="form-group">
+                    <label for="reqTime">请求时间 (reqTime) - 格式: yyyyMMddHHmmss</label>
+                    <input type="text" id="reqTime" class="form-control" placeholder="留空自动生成当前时间">
+                </div>
+
+                <button type="button" class="btn btn-primary" onclick="generateSignature()">
+                    🔒 生成签名
+                </button>
+                <button type="button" class="btn btn-secondary" onclick="clearForm()">
+                    🗑️ 清空表单
+                </button>
+            </div>
+
+            <div id="resultContainer" style="display: none;">
+                <div class="result-section">
+                    <h3>📋 签名结果</h3>
+                    <div class="result-item">
+                        <label>生成的签名 (sign):</label>
+                        <div id="generatedSignature" class="result-value"></div>
+                    </div>
+                    <div class="result-item">
+                        <label>完整请求参数 (包含签名):</label>
+                        <div id="fullRequestParams" class="result-value"></div>
+                    </div>
+                </div>
+
+                <div class="steps-section">
+                    <h3>🔍 签名生成详细步骤</h3>
+                    <div id="signatureSteps"></div>
+                </div>
+            </div>
+
+            <div id="errorContainer"></div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+    <script>
+        function loadExample() {
+            // 加载官方示例数据
+            document.getElementById('platId').value = '1000';
+            document.getElementById('privateKey').value = 'EWEFD123RGSRETYDFNGFGFGSHDFGH';
+            document.getElementById('mchOrderNo').value = 'P0123456789101';
+            document.getElementById('amount').value = '10000';
+            document.getElementById('clientIp').value = '192.168.0.111';
+            document.getElementById('returnUrl').value = 'https://www.baidu.com';
+            document.getElementById('notifyUrl').value = 'https://www.baidu.com';
+            document.getElementById('reqTime').value = '20190723141000';
+            document.getElementById('version').value = '1.0';
+            
+            showSuccess('已加载官方示例数据，可以直接点击"生成签名"验证算法正确性！');
+        }
+
+        function toggleJsonImport() {
+            const section = document.getElementById('jsonImportSection');
+            if (section.style.display === 'none') {
+                section.style.display = 'block';
+            } else {
+                section.style.display = 'none';
+            }
+        }
+
+        function cleanJsonFormat() {
+            try {
+                const jsonInput = document.getElementById('jsonInput');
+                const originalJson = jsonInput.value.trim();
+                
+                if (!originalJson) {
+                    showError('请先输入JSON数据');
+                    return;
+                }
+
+                // 清理JSON字符串
+                const cleanedJson = originalJson
+                    .replace(/[\t\r\n]/g, ' ')  // 将制表符、回车、换行替换为空格
+                    .replace(/\s+/g, ' ')       // 将多个连续空格替换为单个空格
+                    .replace(/,\s*}/g, '}')     // 移除对象末尾多余的逗号
+                    .replace(/,\s*]/g, ']');    // 移除数组末尾多余的逗号
+
+                // 尝试解析并重新格式化
+                const parsed = JSON.parse(cleanedJson);
+                const formatted = JSON.stringify(parsed, null, 4);
+                
+                jsonInput.value = formatted;
+                showSuccess('✅ JSON格式已清理并重新格式化！');
+                
+            } catch (error) {
+                showError(`JSON清理失败: ${error.message}\n\n💡 请检查JSON语法是否正确`);
+            }
+        }
+
+        function importFromJson() {
+            try {
+                const jsonInput = document.getElementById('jsonInput').value.trim();
+                if (!jsonInput) {
+                    showError('请输入JSON数据');
+                    return;
+                }
+
+                // 清理JSON字符串中的控制字符（如制表符、换行符等）
+                const cleanedJson = jsonInput
+                    .replace(/[\t\r\n]/g, ' ')  // 将制表符、回车、换行替换为空格
+                    .replace(/\s+/g, ' ')       // 将多个连续空格替换为单个空格
+                    .replace(/,\s*}/g, '}')     // 移除对象末尾多余的逗号
+                    .replace(/,\s*]/g, ']');    // 移除数组末尾多余的逗号
+
+                const data = JSON.parse(cleanedJson);
+                
+                // 映射JSON字段到表单字段
+                const fieldMapping = {
+                    'platId': 'platId',
+                    'mchNo': 'mchNo',
+                    'appId': 'appId',
+                    'mchOrderNo': 'mchOrderNo',
+                    'amount': 'amount',
+                    'wayCode': 'wayCode',
+                    'currency': 'currency',
+                    'clientIp': 'clientIp',
+                    'subject': 'subject',
+                    'body': 'body',
+                    'returnUrl': 'returnUrl',
+                    'notifyUrl': 'notifyUrl',
+                    'reqTime': 'reqTime',
+                    'version': 'version',
+                    'expiredTime': 'expiredTime',
+                    'channelExtra': 'channelExtra',
+                    'extParam': 'extParam',
+                    'divisionMode': 'divisionMode'
+                };
+
+                let importedCount = 0;
+                
+                // 遍历JSON数据并填充表单
+                Object.keys(data).forEach(key => {
+                    if (key === 'sign' || key === 'signType') {
+                        // 跳过签名相关字段
+                        return;
+                    }
+                    
+                    const fieldId = fieldMapping[key] || key;
+                    const element = document.getElementById(fieldId);
+                    
+                    if (element) {
+                        let value = data[key];
+                        
+                        // 处理时间格式转换
+                        if (key === 'reqTime' && typeof value === 'string' && value.includes('T')) {
+                            // 将ISO时间格式转换为yyyyMMddHHmmss格式
+                            const date = new Date(value);
+                            if (!isNaN(date.getTime())) {
+                                value = date.getFullYear().toString() +
+                                       (date.getMonth() + 1).toString().padStart(2, '0') +
+                                       date.getDate().toString().padStart(2, '0') +
+                                       date.getHours().toString().padStart(2, '0') +
+                                       date.getMinutes().toString().padStart(2, '0') +
+                                       date.getSeconds().toString().padStart(2, '0');
+                            }
+                        }
+                        
+                        // 处理对象类型的值（如channelExtra）
+                        if (typeof value === 'object' && value !== null) {
+                            value = JSON.stringify(value);
+                        }
+                        
+                        element.value = value;
+                        importedCount++;
+                    }
+                });
+
+                if (importedCount > 0) {
+                    showSuccess(`✅ 成功导入 ${importedCount} 个字段数据！`);
+                    // 隐藏JSON导入区域
+                    document.getElementById('jsonImportSection').style.display = 'none';
+                } else {
+                    showError('未找到可导入的有效字段');
+                }
+
+            } catch (error) {
+                console.error('JSON解析错误详情:', error);
+                let errorMessage = `JSON解析失败: ${error.message}`;
+                
+                // 提供更友好的错误提示
+                if (error.message.includes('control character')) {
+                    errorMessage += '\n\n💡 提示：JSON中包含不可见的控制字符（如制表符），请检查并清理JSON格式。';
+                } else if (error.message.includes('Unexpected token')) {
+                    errorMessage += '\n\n💡 提示：JSON格式不正确，请检查括号、引号、逗号是否匹配。';
+                } else if (error.message.includes('Unexpected end')) {
+                    errorMessage += '\n\n💡 提示：JSON不完整，请检查是否缺少结束括号。';
+                }
+                
+                showError(errorMessage);
+            }
+        }
+
+        function generateSignature() {
+            try {
+                // 获取表单数据
+                const platId = document.getElementById('platId').value.trim();
+                const privateKey = document.getElementById('privateKey').value.trim();
+                
+                // 验证必填字段
+                if (!platId || !privateKey) {
+                    showError('平台ID和私钥是必填字段');
+                    return;
+                }
+
+                // 获取所有参数
+                const params = {};
+                
+                // 必需参数
+                if (platId) params.platId = platId;
+                
+                // 可选参数 - 支持更多字段
+                const fieldList = [
+                    'mchNo', 'appId', 'mchOrderNo', 'amount', 'wayCode', 'currency',
+                    'clientIp', 'subject', 'body', 'returnUrl', 'notifyUrl', 
+                    'expiredTime', 'channelExtra', 'extParam', 'divisionMode'
+                ];
+                
+                fieldList.forEach(fieldName => {
+                    const value = document.getElementById(fieldName).value.trim();
+                    if (value) {
+                        params[fieldName] = value;
+                    }
+                });
+                
+                let reqTime = document.getElementById('reqTime').value.trim();
+                if (!reqTime) {
+                    // 生成当前时间 yyyyMMddHHmmss 格式
+                    const now = new Date();
+                    reqTime = now.getFullYear().toString() +
+                             (now.getMonth() + 1).toString().padStart(2, '0') +
+                             now.getDate().toString().padStart(2, '0') +
+                             now.getHours().toString().padStart(2, '0') +
+                             now.getMinutes().toString().padStart(2, '0') +
+                             now.getSeconds().toString().padStart(2, '0');
+                    document.getElementById('reqTime').value = reqTime;
+                }
+                if (reqTime) params.reqTime = reqTime;
+                
+                const version = document.getElementById('version').value.trim();
+                if (version) params.version = version;
+
+                // 生成签名的步骤记录
+                const steps = [];
+
+                // Step 1: 显示原始参数
+                steps.push({
+                    title: '第一步: 收集所有非空参数',
+                    content: JSON.stringify(params, null, 2)
+                });
+
+                // Step 2: 参数排序
+                const sortedKeys = Object.keys(params).sort();
+                steps.push({
+                    title: '第二步: 按参数名ASCII码排序（字典序）',
+                    content: `排序后的参数名: [${sortedKeys.join(', ')}]`
+                });
+
+                // Step 3: 构建stringA
+                const stringA = sortedKeys.map(key => `${key}=${params[key]}`).join('&');
+                steps.push({
+                    title: '第三步: 构建stringA（URL键值对格式）',
+                    content: stringA
+                });
+
+                // Step 4: 拼接私钥
+                const stringSignTemp = `${stringA}&key=${privateKey}`;
+                steps.push({
+                    title: '第四步: 在stringA最后拼接私钥',
+                    content: stringSignTemp
+                });
+
+                // Step 5: MD5签名并转大写
+                const signature = CryptoJS.MD5(stringSignTemp).toString().toUpperCase();
+                steps.push({
+                    title: '第五步: MD5运算并转换为大写',
+                    content: signature
+                });
+
+                // 构建最终请求参数
+                const finalParams = { ...params, sign: signature };
+                const finalParamsString = Object.keys(finalParams)
+                    .sort()
+                    .map(key => `${key}=${finalParams[key]}`)
+                    .join('&');
+
+                // 显示结果
+                displayResult(signature, finalParamsString, steps);
+                hideError();
+
+                // 验证是否与官方示例一致
+                if (signature === '4A5078DABBCE0D9C4E7668DACB96FF7A') {
+                    showSuccess('🎉 签名验证成功！生成的签名与官方示例完全一致！');
+                }
+
+            } catch (error) {
+                showError(`签名生成失败: ${error.message}`);
+            }
+        }
+
+        function displayResult(signature, fullParams, steps) {
+            document.getElementById('generatedSignature').textContent = signature;
+            document.getElementById('fullRequestParams').textContent = fullParams;
+
+            // 显示签名生成步骤
+            const stepsContainer = document.getElementById('signatureSteps');
+            stepsContainer.innerHTML = '';
+            steps.forEach((step, index) => {
+                const stepDiv = document.createElement('div');
+                stepDiv.className = 'step';
+                stepDiv.innerHTML = `
+                    <div class="step-title">${step.title}</div>
+                    <div class="step-content">${step.content}</div>
+                `;
+                stepsContainer.appendChild(stepDiv);
+            });
+
+            document.getElementById('resultContainer').style.display = 'block';
+            document.getElementById('resultContainer').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        function clearForm() {
+            // 清空所有表单字段
+            const inputs = document.querySelectorAll('input, textarea');
+            inputs.forEach(input => {
+                if (input.id !== 'version' && input.id !== 'currency') { // 保留默认值
+                    input.value = '';
+                }
+            });
+            
+            // 恢复默认值
+            document.getElementById('version').value = '1.0';
+            document.getElementById('currency').value = 'CNY';
+            
+            // 隐藏结果和JSON导入区域
+            document.getElementById('resultContainer').style.display = 'none';
+            document.getElementById('jsonImportSection').style.display = 'none';
+            
+            hideError();
+            hideSuccess();
+        }
+
+        function showError(message) {
+            hideSuccess();
+            const errorContainer = document.getElementById('errorContainer');
+            // 将换行符转换为HTML换行
+            const formattedMessage = message.replace(/\n/g, '<br>');
+            errorContainer.innerHTML = `<div class="error">❌ ${formattedMessage}</div>`;
+        }
+
+        function showSuccess(message) {
+            hideError();
+            const errorContainer = document.getElementById('errorContainer');
+            errorContainer.innerHTML = `<div class="success">✅ ${message}</div>`;
+        }
+
+        function hideError() {
+            const errorContainer = document.getElementById('errorContainer');
+            const errorDiv = errorContainer.querySelector('.error');
+            if (errorDiv) {
+                errorDiv.remove();
+            }
+        }
+
+        function hideSuccess() {
+            const errorContainer = document.getElementById('errorContainer');
+            const successDiv = errorContainer.querySelector('.success');
+            if (successDiv) {
+                successDiv.remove();
+            }
+        }
+
+        // 页面加载时的初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            // 设置默认值
+            document.getElementById('version').value = '1.0';
+            document.getElementById('currency').value = 'CNY';
+        });
+    </script>
+</body>
+</html>
