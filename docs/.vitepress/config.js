@@ -94,7 +94,7 @@ export default defineConfig({
 
     footer: {
       message: '三希智付 API Documentation',
-      copyright: 'Copyright © 2023-2024 三希智付科技有限公司 | <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">ICP备案号待补充</a>'
+      copyright: 'Copyright © 2026 三希智付科技有限公司 | <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">苏ICP备2026012613号-1</a>'
     },
 
     search: {
