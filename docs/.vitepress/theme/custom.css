@@ -1,8 +1,12 @@
 /* VitePress 内容宽度优化 - 基于最佳实践 */
 
-/* CSS变量设置 - 扩大整体布局宽度 */
+/* CSS变量设置 - 扩大整体布局宽度
+   必须用 min(1920px, 100vw)：VitePress 在 ≥1440px 断点用
+   calc((100% - (var(--vp-layout-max-width) - 64px)) / 2 + var(--vp-sidebar-width) - 32px)
+   计算侧边栏/导航标题宽度，固定 1920px 会在 1440~1856px 视口下产生负偏移，
+   把侧边栏压成 112px（菜单文字截断、标题与搜索框重叠）。 */
 :root {
-  --vp-layout-max-width: 1920px;
+  --vp-layout-max-width: min(1920px, 100vw);
 }
 
 /* 核心容器宽度设置 - 使用 kaisugi 的解决方案 */
