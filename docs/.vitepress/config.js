@@ -1,6 +1,8 @@
 import { defineConfig } from 'vitepress'
 
 export default defineConfig({
+  // /SanxiPayDemo.java 是 docs/public/ 下的真实静态文件（下载链接），非页面路由
+  ignoreDeadLinks: [/^\/SanxiPayDemo\.java$/],
   title: '三希智付 API 文档',
   description: '三希智付支付系统接口文档',
   lang: 'zh-CN',
@@ -57,6 +59,13 @@ export default defineConfig({
           { text: '退款接口', link: '/2_refund-api' },
           { text: '转账接口', link: '/3_transfer-api' },
           { text: '分账接口', link: '/4_split-api' }
+        ]
+      },
+      {
+        text: '对接示例',
+        collapsed: false,
+        items: [
+          { text: 'Java 对接示例', link: '/5_java-demo' }
         ]
       },
       {

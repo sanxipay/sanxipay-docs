@@ -28,6 +28,7 @@ features:
     details: 内置搜索功能，快速找到所需的接口文档
   - title: 📖 完整文档
     details: 包含请求参数、返回参数、示例代码等完整信息
-  - title: 🚀 快速部署
-    details: 基于 VitePress 构建，支持快速部署和自定义主题
+  - title: ☕ Java 对接示例
+    details: 单文件零依赖示例程序，覆盖签名、下单、查单、退款与异步通知接收
+    link: /5_java-demo
 --- 
