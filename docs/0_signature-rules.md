@@ -33,7 +33,7 @@
 ◆ 验证调用返回或支付中心主动通知签名时，传送的sign参数不参与签名，将生成的签名与该sign值作校验。   
 ◆ 支付中心接口可能增加字段，验证签名时必须支持增加的扩展字段
 
-***第二步：*** 在stringA最后拼接上key`[即 StringA +"&key=" + 私钥 ]` 得到stringSignTemp字符串，并对stringSignTemp进行MD5运算，再将得到的字符串所有字符转换为大写，得到sign值signValue。
+***第二步：*** stringA 的最后一个片段已经以 `&` 结尾，直接拼接 `key=私钥`（即 `stringSignTemp = stringA + "key=" + 私钥`），再对stringSignTemp进行MD5运算，并将结果转换为大写，得到sign值signValue。
 
 如请求统一下单API参数如下：
 ```java

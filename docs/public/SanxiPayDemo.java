@@ -452,7 +452,8 @@ public class SanxiPayDemo {
      *   ◆ 参数值为空不参与签名；            ◆ 参数名区分大小写；
      *   ◆ sign 字段自身不参与签名；         ◆ 值取原文拼接，不做 URL 编码（与文档示例一致）；
      *   ◆ 验签时必须支持支付中心新增的扩展字段。
-     * 第二步：stringSignTemp = stringA + "&key=" + 私钥，对其做 MD5（UTF-8）运算，
+     * 第二步：stringA 的最后一个片段已经以 & 结尾，直接拼接 "key=" + 私钥得到 stringSignTemp，
+     *         再对其做 MD5（UTF-8）运算，
      *         再将得到的字符串所有字符转换为大写，即为 sign 值。
      *
      * @param params 参与签名的全部参数（值可为 String/Number 等，统一按字符串原文参与拼接）
@@ -486,7 +487,7 @@ public class SanxiPayDemo {
         fragments.sort(String.CASE_INSENSITIVE_ORDER);
         StringBuilder sb = new StringBuilder(256);
         for (String fragment : fragments) sb.append(fragment);
-        sb.append("key=").append(secret);                      // stringA + "&key=" + 私钥
+        sb.append("key=").append(secret);                      // stringA 已以 & 结尾，直接拼 key=私钥
         return sb.toString();
     }
 
