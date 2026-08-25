@@ -1,14 +1,14 @@
 # Java 对接示例
 
 ::: tip ☕ 单文件 · 零第三方依赖 · 可直接运行
-[点此下载完整源码 SanxiPayDemo.java](/SanxiPayDemo.java)（含逐行中文注释）。
+<a href="/SanxiPayDemo.java" download>点此下载完整源码 SanxiPayDemo.java</a>（含逐行中文注释）。
 仅使用 JDK 17+ 标准库，无需 Maven/Gradle，`javac` 编译即可运行。
 覆盖：MD5 签名、统一下单、支付查单、关闭订单、统一退款、退款查单、**支付/退款通知接收端**。
 :::
 
 ## 快速开始
 
-**第 1 步**：下载 [SanxiPayDemo.java](/SanxiPayDemo.java)，通过环境变量提供平台分配的四个值。示例不会从源码常量或默认值读取真实凭据，缺少任一必填值会立即退出：
+**第 1 步**：下载 <a href="/SanxiPayDemo.java" download>SanxiPayDemo.java</a>，通过环境变量提供平台分配的四个值。示例不会从源码常量或默认值读取真实凭据，缺少任一必填值会立即退出：
 
 ```bash
 export SANXIPAY_GATEWAY='https://pay.sanxipay.com'
@@ -85,7 +85,7 @@ unifiedOrder("QR_CASHIER", 1L, "商品标题", "{\"payDataType\":\"codeImgUrl\"}
 | 校验 | 要点 |
 |------|------|
 | ① 验签 | 对全部非空参数（sign 除外）按签名算法计算并比对，失败必须拒绝 |
-| ② 业务核对 | 支付核对 `mchOrderNo + amount`；退款核对 `mchRefundNo + refundAmount`；未知订单或 `state!=2` 必须拒绝 |
+| ② 业务核对 | 支付核对 `mchOrderNo + amount` 且仅接受 `state=2`；退款核对 `mchRefundNo + refundAmount`，接受 `state=2` 成功或 `state=3` 失败；未知订单与其他状态必须拒绝 |
 | ③ 幂等 | 支付以 `payOrderId` 幂等，退款以 `refundOrderId` 幂等；两类通知不能共用 `payOrderId` 作为唯一键 |
 
 全部通过后应答**小写字符串 `success`**（前后不能有空格和换行符）；否则平台会按
@@ -102,6 +102,6 @@ unifiedOrder("QR_CASHIER", 1L, "商品标题", "{\"payDataType\":\"codeImgUrl\"}
 
 ## 完整源码
 
-> 也可直接[下载源文件](/SanxiPayDemo.java)。
+> 也可直接<a href="/SanxiPayDemo.java" download>下载源文件</a>。
 
 <<< @/public/SanxiPayDemo.java{java}
