@@ -209,8 +209,8 @@ payDataType设置返回支付数据支付类型，此时payDataType可以为：c
 ------- | -------| -------| -------| -------| -------
 商户号 | mchNo | 是 | String(30) | M1621873433953 | 商户号 
 应用ID | appId | 是 | String(24) | 60cc09bce4b0f1c0b83761c9 | 应用ID
-支付订单号 | payOrderId | 是 | String(30) | P20160427210604000490 | 支付中心生成的订单号，与mchOrderNo二者传一即可  
-商户订单号 | mchOrderNo | 是 | String(30) | 20160427210604000490 | 商户生成的订单号，与payOrderId二者传一即可  
+支付订单号 | payOrderId | 二选一 | String(30) | P20160427210604000490 | 与mchOrderNo二者传一即可
+商户订单号 | mchOrderNo | 二选一 | String(30) | 20160427210604000490 | 与payOrderId二者传一即可
 请求时间 | reqTime | 是 | long | 1622016572190 | 请求接口时间,13位时间戳  
 接口版本 | version | 是 | String(3) | 1.0 | 接口版本号，固定：1.0  
 签名 | sign | 是 | String(32) | C380BEC2BFD727A4B6845133519F3AD6 | 签名值，详见签名算法  
@@ -308,8 +308,8 @@ payDataType设置返回支付数据支付类型，此时payDataType可以为：c
 ------- | -------| -------| -------| -------| -------
 商户号 | mchNo | 是 | String(30) | M1621873433953 | 商户号 
 应用ID | appId | 是 | String(24) | 60cc09bce4b0f1c0b83761c9 | 应用ID
-支付订单号 | payOrderId | 是 | String(30) | P20160427210604000490 | 支付中心生成的订单号，与mchOrderNo二者传一即可  
-商户订单号 | mchOrderNo | 是 | String(30) | 20160427210604000490 | 商户生成的订单号，与payOrderId二者传一即可  
+支付订单号 | payOrderId | 二选一 | String(30) | P20160427210604000490 | 与mchOrderNo二者传一即可
+商户订单号 | mchOrderNo | 二选一 | String(30) | 20160427210604000490 | 与payOrderId二者传一即可
 请求时间 | reqTime | 是 | long | 1622016572190 | 请求接口时间,13位时间戳  
 接口版本 | version | 是 | String(3) | 1.0 | 接口版本号，固定：1.0  
 签名 | sign | 是 | String(32) | C380BEC2BFD727A4B6845133519F3AD6 | 签名值，详见签名算法  
@@ -360,6 +360,10 @@ payDataType设置返回支付数据支付类型，此时payDataType可以为：c
 ## 支付通知
 
 当订单支付成功时，支付网关会向商户系统发起回调通知。如果商户系统没有正确返回，支付网关会延迟再次通知。
+
+::: warning 商户必须完成的处理
+先验签，再按 `mchOrderNo` 查询本地订单并核对 `amount`，仅在 `state=2` 时执行发货/记账。以 `payOrderId` 建立持久化唯一约束或等价幂等机制；重复通知必须返回 `success`，但不得重复执行业务。未知订单、金额不符、状态不符或验签失败均不得返回成功。
+:::
 
 > 接口说明
 

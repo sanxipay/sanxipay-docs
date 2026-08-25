@@ -17,7 +17,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.TreeMap;
 
 /**
  * ============================================================================
@@ -32,13 +31,22 @@ import java.util.TreeMap;
  *  特点：单文件、零第三方依赖，仅使用 JDK 标准库（Java 17+ 可直接 javac 编译）。
  *
  *  编译：javac SanxiPayDemo.java
- *  运行：java SanxiPayDemo [wayCode] [amount(分)]
+ *  运行：java SanxiPayDemo [wayCode] [amount(分)] [channelExtra] [--allow-qr-cashier-fallback]
  *        例：java SanxiPayDemo                # 默认 QR_CASHIER（聚合扫码），金额 1 分
  *            java SanxiPayDemo ALI_QR 100    # 支付宝二维码，1.00 元
- *        回调接收端（另开进程/机器，公网可达后把 NOTIFY_URL 指向它）：
+ *            java SanxiPayDemo WX_JSAPI 100   # 默认不降级，直接显示原错误
+ *            java SanxiPayDemo WX_JSAPI 100 --allow-qr-cashier-fallback  # 显式允许降级到聚合收银台
+ *            java SanxiPayDemo QR_CASHIER 1 '{"payDataType":"codeImgUrl"}'   # 返回二维码图片地址
+ *            java SanxiPayDemo query <mchOrderNo>
+ *            java SanxiPayDemo refund <mchOrderNo> <mchRefundNo> <amountFen>
+ *            java SanxiPayDemo refund-query <mchRefundNo>
+ *        回调接收端（先显式登记本次测试的业务单号和金额，再把 NOTIFY_URL 指向它）：
+ *            export SANXIPAY_EXPECTED_PAYMENTS='商户支付单号=金额分'
+ *            export SANXIPAY_EXPECTED_REFUNDS='商户退款单号=金额分'
  *            java SanxiPayDemo notify-server [端口]   # 默认 20250，路径任意（如 /pay/notify）
  *
- *  运行前请先将下方常量区 MCH_NO / APP_ID / APP_SECRET 替换为平台分配的真实参数。
+ *  运行前通过环境变量提供 SANXIPAY_GATEWAY / SANXIPAY_MCH_NO / SANXIPAY_APP_ID /
+ *  SANXIPAY_APP_SECRET；缺任一必填值立即终止，不把真实凭据写进源码。
  *
  *  异步通知要点（notifyUrl 回调，默认 POST application/x-www-form-urlencoded）：
  *        商户系统处理成功后必须返回小写字符串 success（前后不能有空格和换行符），
@@ -49,26 +57,34 @@ import java.util.TreeMap;
  *    1. 错误处理为演示级：HTTP 异常直接抛出、无重试/熔断/超时退避 —— 生产请按自身框架包装；
  *    2. 响应验签失败本 Demo 默认直接抛异常终止（STRICT_RESP_VERIFY）—— 生产同样必须拒绝
  *       处理验签失败的响应/通知，绝不能"只打日志继续走"；
- *    3. 回调必须做幂等（同一订单可能重复通知）+ 金额核对（通知 amount 与本地订单一致）
- *       + 状态判断（state==2 才是支付成功）—— 三者缺一不可，详见 NotifyServer 注释；
+ *    3. 回调必须区分支付单与退款单，分别做幂等、金额核对和状态判断。Demo 用两个显式环境变量
+ *       模拟本地订单库；生产必须替换为真实数据库查询与唯一约束，详见 NotifyServer 注释；
  *    4. 查单轮询请用递增间隔（如 2/5/10/30s），不要照抄本 Demo 的固定 sleep。
  * ============================================================================
  */
 public class SanxiPayDemo {
 
-    /* ==================== 常量区（对接前必须替换） ==================== */
+    /* ==================== 运行配置（NO FALLBACK） ==================== */
+
+    static String requireEnv(String name) {
+        String value = System.getenv(name);
+        if (value == null || value.isBlank()) {
+            throw new IllegalStateException("Missing required environment variable: " + name);
+        }
+        return value;
+    }
 
     /** 支付网关地址（文档：各接口请求 URL 的公共前缀） */
-    static final String GATEWAY = "https://pay.sanxipay.com";
+    static final String GATEWAY = requireEnv("SANXIPAY_GATEWAY");
 
-    /** 商户号：平台分配，形如 M1621873433953 —— 请替换 */
-    static final String MCH_NO = "你的商户号mchNo";
+    /** 商户号：平台分配，形如 M1621873433953 */
+    static final String MCH_NO = requireEnv("SANXIPAY_MCH_NO");
 
-    /** 应用ID：平台分配，形如 60cc09bce4b0f1c0b83761c9 —— 请替换 */
-    static final String APP_ID = "你的应用appId";
+    /** 应用ID：平台分配，形如 60cc09bce4b0f1c0b83761c9 */
+    static final String APP_ID = requireEnv("SANXIPAY_APP_ID");
 
-    /** 商户私钥（文档《签名规则》：运营管理平台可以管理商户的私钥）—— 请替换 */
-    static final String APP_SECRET = "你的私钥appSecret";
+    /** 商户私钥（文档《签名规则》：运营管理平台可以管理商户的私钥） */
+    static final String APP_SECRET = requireEnv("SANXIPAY_APP_SECRET");
 
     /** 客户端 IPV4（可选参数 clientIp 的演示取值，实际请传真实用户 IP） */
     static final String CLIENT_IP = "127.0.0.1";
@@ -76,9 +92,10 @@ public class SanxiPayDemo {
     /**
      * 支付/退款结果异步通知地址（可选。文档：只有传了该值才会发起回调；留空则不回调）。
      * 联调回调时：先 `java SanxiPayDemo notify-server 20250` 启动本文件自带的接收端，
-     * 再把此处填为其公网可达地址（如 "http://你的域名或IP:20250/pay/notify"）。
+     * 再设置可选环境变量 SANXIPAY_NOTIFY_URL 为其公网可达地址。
      */
-    static final String NOTIFY_URL = "";
+    static final String NOTIFY_URL = System.getenv("SANXIPAY_NOTIFY_URL") == null
+            ? "" : System.getenv("SANXIPAY_NOTIFY_URL");
 
     /** 调试开关：true 时打印待签名串（私钥已脱敏）。排查"签名失败"时打开，与文档《签名规则》示例逐字比对 */
     static final boolean DEBUG_SIGN = false;
@@ -106,30 +123,82 @@ public class SanxiPayDemo {
             NotifyServer.start(args.length > 1 ? Integer.parseInt(args[1]) : 20250);
             return; // start() 内部阻塞常驻，此 return 仅为可读性
         }
+        if (args.length > 0 && "query".equals(args[0])) {
+            if (args.length != 2) throw new IllegalArgumentException("Usage: query <mchOrderNo>");
+            requireBusinessSuccess(queryOrder(args[1]), "查询订单");
+            return;
+        }
+        if (args.length > 0 && "refund".equals(args[0])) {
+            if (args.length != 4) {
+                throw new IllegalArgumentException("Usage: refund <mchOrderNo> <mchRefundNo> <amountFen>");
+            }
+            requireBusinessSuccess(
+                    refund(args[1], args[2], Long.parseLong(args[3]), "三希智付对接验收退款"),
+                    "统一退款");
+            return;
+        }
+        if (args.length > 0 && "refund-query".equals(args[0])) {
+            if (args.length != 2) throw new IllegalArgumentException("Usage: refund-query <mchRefundNo>");
+            requireBusinessSuccess(queryRefund(args[1]), "查询退款");
+            return;
+        }
 
+        // 解析命令行参数：
+        //   java SanxiPayDemo [wayCode] [amount(分)] [channelExtra] [--allow-qr-cashier-fallback]
+        // 默认 fail-fast，不把直连渠道配置错误藏在新建的 QR_CASHIER 订单后面；只有显式传入开关才降级。
+        boolean fallbackToQrCashier = false;
+        List<String> positional = new ArrayList<>();
+        for (String arg : args) {
+            if ("--allow-qr-cashier-fallback".equals(arg)) {
+                fallbackToQrCashier = true;
+            } else {
+                positional.add(arg);
+            }
+        }
         // wayCode 可用第 1 个命令行参数指定，默认 QR_CASHIER（聚合扫码：用户扫商家）。
         // 全部支付方式见文档《支付接口》"支付方式"表：WEB_CASHIER / QR_CASHIER / AUTO_BAR /
         // ALI_BAR / ALI_JSAPI / ALI_APP / ALI_WAP / ALI_PC / ALI_QR / WX_BAR / WX_JSAPI /
         // WX_LITE / WX_APP / WX_H5 / WX_NATIVE / YSF_BAR / YSF_JSAPI / AUTO_POS / DCEP_BAR / DCEP_QR
-        String wayCode = args.length > 0 ? args[0] : "QR_CASHIER";
+        final String originalWayCode = positional.isEmpty() ? "QR_CASHIER" : positional.get(0);
         // 金额可用第 2 个命令行参数指定，单位【分】，不能带小数（文档《签名规则》-参数规范），默认 1 分
-        long amount = args.length > 1 ? Long.parseLong(args[1]) : 1L;
+        long amount = positional.size() > 1 ? Long.parseLong(positional.get(1)) : 1L;
+        // channelExtra 可传第 3 个参数；降级到 QR_CASHIER 时会保留原渠道参数（如 {"payDataType":"codeImgUrl"}）
+        String channelExtra = positional.size() > 2 ? positional.get(2) : "";
+
+        // 可选兼容策略：调用方显式允许时，非 QR_CASHIER 的 wayCode 下单失败可降级到聚合收银台。
+        // QR_CASHIER 为两段式支付：下单只生成本地订单+收银台 URL，不碰上游渠道，因此不会触发
+        // 渠道级签名/授权错误；降级会创建一个新的商户订单号，不能作为直连渠道验收结果。
 
         System.out.println("================ 三希智付 API 对接演示 ================");
-        System.out.println("网关: " + GATEWAY + " , wayCode: " + wayCode + " , amount(分): " + amount);
-        if (MCH_NO.contains("你的") || APP_ID.contains("你的") || APP_SECRET.contains("你的")) {
-            System.out.println("!!! 提醒：常量区 MCH_NO / APP_ID / APP_SECRET 仍是占位值，签名必然失败；");
-            System.out.println("!!!       请先替换为平台分配的真实参数。（本次仍会发起请求，便于观察报文格式）");
+        System.out.println("网关: " + GATEWAY + " , wayCode: " + originalWayCode + " , amount(分): " + amount);
+        if (fallbackToQrCashier) {
+            System.out.println("!!! 已显式允许 QR_CASHIER 降级；降级订单不能作为原直连渠道验收结果。");
+        } else {
+            System.out.println(">>> 默认 fail-fast：直连渠道失败时不自动创建 QR_CASHIER 订单。");
+        }
+        /* ---------- 第 1 步：统一下单（文档：《支付接口》-统一下单） ---------- */
+        Map<String, Object> orderResp = unifiedOrder(originalWayCode, amount, "三希智付对接测试商品", channelExtra);
+        Map<String, Object> orderData = dataOf(orderResp);
+        String activeWayCode = originalWayCode;
+
+        // 如果指定 wayCode 失败且启用了 QR_CASHIER 降级，则重试聚合收银台，避免在接口层直接报错。
+        // 判定"失败"：网关 code!=0，或 code==0 但 orderState==3（支付失败）且无可用支付参数。
+        if (fallbackToQrCashier && !"QR_CASHIER".equals(originalWayCode) && shouldFallbackToQrCashier(orderData)) {
+            Map<String, Object> originalResp = orderResp;
+            System.out.println("!!! wayCode=" + originalWayCode + " 统一下单失败，自动降级到 QR_CASHIER 聚合收银台继续推进用户旅程。");
+            orderResp = unifiedOrder("QR_CASHIER", amount, "三希智付对接测试商品", channelExtra);
+            orderData = dataOf(orderResp);
+            activeWayCode = "QR_CASHIER";
+            if (orderData == null && originalResp != null) {
+                System.out.println("!!! QR_CASHIER 兜底也失败，原始下单报错：code=" + originalResp.get("code")
+                        + " , msg=" + originalResp.get("msg"));
+            }
         }
 
-        /* ---------- 第 1 步：统一下单（文档：《支付接口》-统一下单） ---------- */
-        Map<String, Object> orderResp = unifiedOrder(wayCode, amount, "三希智付对接测试商品");
-        Map<String, Object> orderData = dataOf(orderResp);
         if (orderData == null) {
-            System.out.println("下单未获得业务数据，流程终止。");
-            return;
+            throw new IllegalStateException("统一下单失败，未获得业务数据");
         }
-        printData("统一下单返回 data", orderData);
+        printData("统一下单返回 data [" + activeWayCode + "]", orderData);
         // 重点字段：payDataType 决定 payData 如何使用（文档：统一下单-返回参数）
         //   payUrl-跳转链接 / form-表单 / wxapp-微信支付参数 / aliapp-支付宝APP参数 /
         //   ysfapp-云闪付APP参数 / codeUrl-二维码地址 / codeImgUrl-二维码图片地址 / none-空支付参数
@@ -259,6 +328,13 @@ public class SanxiPayDemo {
         return send("/api/refund/refundOrder", p, "统一退款");
     }
 
+    /** 查询退款结果（POST {GATEWAY}/api/refund/query），按商户退款单号查询。 */
+    public static Map<String, Object> queryRefund(String mchRefundNo) throws Exception {
+        Map<String, Object> p = newRequest();
+        p.put("mchRefundNo", mchRefundNo);
+        return send("/api/refund/query", p, "查询退款");
+    }
+
     /* ==================== 公共请求逻辑 ==================== */
 
     /** 新建请求参数表并预置商户身份字段 mchNo / appId（LinkedHashMap 仅为报文字段顺序可读，签名与顺序无关） */
@@ -309,6 +385,38 @@ public class SanxiPayDemo {
     }
 
     /**
+     * 判断是否需要降级到 QR_CASHIER：
+     * 1. 网关 code != 0（dataOf 返回 null）；
+     * 2. 或 code == 0 但统一下单返回 orderState == 3（支付失败）且无可用支付参数。
+     *    支付参数为空包含：payDataType / payData 缺失、为空字符串，或 payDataType = "none"。
+     *    orderState 兼容 Number / String 两种 JSON 反序列化形态。
+     */
+    static boolean shouldFallbackToQrCashier(Map<String, Object> data) {
+        if (data == null) return true;
+        int state = intValueOf(data.get("orderState"), -1);
+        return state == 3 && isBlankPayData(data.get("payDataType"), data.get("payData"));
+    }
+
+    /** 将 Number 或 String 解析为 int；无法解析时返回默认值。 */
+    static int intValueOf(Object o, int defaultValue) {
+        if (o instanceof Number n) return n.intValue();
+        if (o != null) {
+            try {
+                return Integer.parseInt(String.valueOf(o).trim());
+            } catch (NumberFormatException ignored) {
+            }
+        }
+        return defaultValue;
+    }
+
+    /** 判定支付参数是否为空（"none" 也视为空，因为表示无需客户端处理）。 */
+    static boolean isBlankPayData(Object payDataType, Object payData) {
+        String type = payDataType == null ? "" : String.valueOf(payDataType).trim();
+        String data = payData == null ? "" : String.valueOf(payData).trim();
+        return (type.isEmpty() || "none".equalsIgnoreCase(type)) && data.isEmpty();
+    }
+
+    /**
      * 提取业务数据：code==0 时返回 data 对象（文档-返回码：0-成功，9999-异常详见 msg 字段），
      * 失败时打印 code / msg 并返回 null；兼容 data 以 JSON 字符串形式返回的情形。
      */
@@ -327,12 +435,20 @@ public class SanxiPayDemo {
         return (data instanceof Map) ? (Map<String, Object>) data : null;
     }
 
+    /** CLI 子命令遇到业务失败必须以非零退出，避免自动验收把失败请求当成功。 */
+    static void requireBusinessSuccess(Map<String, Object> resp, String operation) {
+        Object code = resp.get("code");
+        if (!(code instanceof Number) || ((Number) code).longValue() != 0L) {
+            throw new IllegalStateException(operation + "失败: code=" + code + ", msg=" + resp.get("msg"));
+        }
+    }
+
     /* ==================== 签名（文档：《签名规则》-签名算法） ==================== */
 
     /**
      * MD5 签名（文档《签名规则》-签名算法 第一步/第二步）：
-     * 第一步：取集合 M 内【非空参数值】的参数，按参数名 ASCII 码从小到大排序（字典序），
-     *         用 URL 键值对格式 key1=value1&key2=value2... 拼接成 stringA。
+     * 第一步：取集合 M 内【非空参数值】的参数，先构造每个完整的 key=value& 片段，再按片段
+     *         不区分大小写的字典序排序并拼接成 stringA。
      *   ◆ 参数值为空不参与签名；            ◆ 参数名区分大小写；
      *   ◆ sign 字段自身不参与签名；         ◆ 值取原文拼接，不做 URL 编码（与文档示例一致）；
      *   ◆ 验签时必须支持支付中心新增的扩展字段。
@@ -354,22 +470,22 @@ public class SanxiPayDemo {
 
     /**
      * 组装待签名串 stringSignTemp = 排序拼接串stringA + "&key=" + 私钥（独立成方法便于排查签名问题）。
-     * 排序采用【不区分大小写】的字典序（String.CASE_INSENSITIVE_ORDER），与平台服务端签名工具
-     * （JeepayKit.getSign 的 Arrays.sort(..., String.CASE_INSENSITIVE_ORDER)）逐字一致——
-     * 标准字段全部小写开头时两种字典序结果相同，但若平台新增大写开头扩展字段，ASCII 序会产生验签差异。
+     * 排序对象是完整的 key=value& 片段，不是只排参数名；比较器使用
+     * String.CASE_INSENSITIVE_ORDER，与生产服务端的 Arrays.sort(...) 逐字一致。
      */
     static String stringToSign(Map<String, Object> params, String secret) {
-        Map<String, Object> sorted = new TreeMap<>(String.CASE_INSENSITIVE_ORDER); // 与服务端排序规则一致
-        sorted.putAll(params);
-        StringBuilder sb = new StringBuilder(256);
-        for (Map.Entry<String, Object> e : sorted.entrySet()) {
+        List<String> fragments = new ArrayList<>();
+        for (Map.Entry<String, Object> e : params.entrySet()) {
             String k = e.getKey();
             Object v = e.getValue();
             if ("sign".equals(k) || v == null) continue;       // sign 不参与签名；null 视为空
             String val = (v instanceof Map || v instanceof List) ? toJson(v) : String.valueOf(v);
             if (val.isEmpty()) continue;                       // 空值不参与签名
-            sb.append(k).append('=').append(val).append('&');
+            fragments.add(k + '=' + val + '&');
         }
+        fragments.sort(String.CASE_INSENSITIVE_ORDER);
+        StringBuilder sb = new StringBuilder(256);
+        for (String fragment : fragments) sb.append(fragment);
         sb.append("key=").append(secret);                      // stringA + "&key=" + 私钥
         return sb.toString();
     }
@@ -425,8 +541,8 @@ public class SanxiPayDemo {
 
     /** 支付订单状态含义（文档：统一下单返回 orderState / 查询订单与支付通知返回 state，取值含义相同） */
     static String payStateText(Object state) {
-        if (!(state instanceof Number n)) return "未知";
-        return switch (n.intValue()) {
+        int n = intValueOf(state, -1);
+        return switch (n) {
             case 0 -> "订单生成";
             case 1 -> "支付中";
             case 2 -> "支付成功";
@@ -440,8 +556,8 @@ public class SanxiPayDemo {
 
     /** 退款状态含义（文档《退款接口》：0-订单生成 1-退款中 2-退款成功 3-退款失败 4-退款关闭） */
     static String refundStateText(Object state) {
-        if (!(state instanceof Number n)) return "未知";
-        return switch (n.intValue()) {
+        int n = intValueOf(state, -1);
+        return switch (n) {
             case 0 -> "订单生成";
             case 1 -> "退款中";
             case 2 -> "退款成功";
@@ -519,15 +635,22 @@ public class SanxiPayDemo {
      * 平台按商户配置的通知类型投递（默认 POST form 即 application/x-www-form-urlencoded；
      * 亦可配置为 POST JSON、或参数拼在 URL 上的 queryString 形式），本接收端三种形态全兼容。
      *
-     * 商户系统处理通知的【三道必做校验】（缺一不可，本类 process() 即按此顺序实现）：
+     * 商户系统处理通知的【三道必做校验】（缺一不可，本类 process() 按此顺序演示）：
      *   ① 验签   ：对全部非空参数（sign 自身除外）按《签名规则》计算并与 sign 比对，失败必须拒绝；
-     *   ② 幂等   ：同一订单可能重复通知（平台重试机制），已处理过的直接应答 success，不能重复发货/记账；
-     *   ③ 业务核对：state==2 才是支付成功；amount 必须与本地订单金额一致；mchOrderNo 必须存在于本地。
+     *   ② 业务核对：支付按 mchOrderNo+amount，退款按 mchRefundNo+refundAmount 核对本地预期；
+     *   ③ 幂等   ：支付用 payOrderId、退款用 refundOrderId 分开去重，不能互相误判为重复。
+     * Demo 通过 SANXIPAY_EXPECTED_PAYMENTS / SANXIPAY_EXPECTED_REFUNDS 显式登记预期业务单，
+     * 格式均为「业务单号=金额分」，多笔用逗号分隔；未登记的通知 fail closed。生产必须把这两张
+     * 内存表替换成自己的订单数据库查询，并用数据库唯一约束 / Redis SETNX 做持久化幂等。
      * 全部通过后应答小写 success（无空格/换行）；否则平台按 0/30/60/90/120/150 秒重试（最多 6 次）。
      */
     static final class NotifyServer {
 
-        /** 已处理订单去重表（演示用内存 Set；生产请用 DB 唯一约束 / Redis SETNX 等持久化手段做幂等） */
+        /** 演示用预期业务单；未显式登记就拒绝通知，禁止用默认值假装完成业务核对。 */
+        private static final Map<String, Long> EXPECTED_PAYMENTS = expectedAmounts("SANXIPAY_EXPECTED_PAYMENTS");
+        private static final Map<String, Long> EXPECTED_REFUNDS = expectedAmounts("SANXIPAY_EXPECTED_REFUNDS");
+
+        /** 已处理通知去重表（演示用内存 Set；生产请用 DB 唯一约束 / Redis SETNX 等持久化手段做幂等） */
         private static final Set<String> HANDLED = java.util.concurrent.ConcurrentHashMap.newKeySet();
 
         static void start(int port) throws IOException {
@@ -537,6 +660,8 @@ public class SanxiPayDemo {
             server.start();
             System.out.println("================ 三希智付 异步通知接收端 ================");
             System.out.println("监听端口: " + port + "（通知地址示例: http://<公网IP或域名>:" + port + "/pay/notify）");
+            System.out.println("预期支付单: " + EXPECTED_PAYMENTS.keySet());
+            System.out.println("预期退款单: " + EXPECTED_REFUNDS.keySet());
             System.out.println("等待平台通知中... (Ctrl+C 退出)");
         }
 
@@ -571,23 +696,79 @@ public class SanxiPayDemo {
             }
             System.out.println(">>> 通知验签: 通过");
 
-            // ② 幂等：重复通知直接应答 success（告知平台已收到、停止重试），但绝不重复发货/记账
-            String payOrderId = String.valueOf(p.get("payOrderId"));
-            if (!HANDLED.add(payOrderId)) {
-                System.out.println(">>> 重复通知(payOrderId=" + payOrderId + ")，此前已处理，直接应答 success");
+            // ② 业务核对：先辨认通知类型，再按各自业务单号和金额核对显式预期。
+            boolean isRefund = hasText(p.get("refundOrderId")) || hasText(p.get("mchRefundNo"));
+            String businessNoField = isRefund ? "mchRefundNo" : "mchOrderNo";
+            String amountField = isRefund ? "refundAmount" : "amount";
+            String platformIdField = isRefund ? "refundOrderId" : "payOrderId";
+            String businessNo = requiredText(p, businessNoField);
+            String platformId = requiredText(p, platformIdField);
+            long actualAmount = requiredLong(p, amountField);
+            Map<String, Long> expected = isRefund ? EXPECTED_REFUNDS : EXPECTED_PAYMENTS;
+            Long expectedAmount = expected.get(businessNo);
+            if (expectedAmount == null) {
+                return "fail: unknown " + (isRefund ? "refund" : "payment") + " order";
+            }
+            if (expectedAmount.longValue() != actualAmount) {
+                return "fail: amount mismatch";
+            }
+            int state = toInt(p.get("state"), -1);
+            boolean acceptedState = isRefund ? state == 2 || state == 3 : state == 2;
+            if (!acceptedState) {
+                return "fail: unexpected state";
+            }
+            System.out.println(">>> " + (isRefund ? "退款" : "支付") + "业务核对通过: "
+                    + businessNo + " amount=" + actualAmount + " state=" + state);
+
+            // ③ 幂等：支付和退款分别使用各自平台单号，避免同一 payOrderId 下的退款被误判为支付重复通知。
+            String idempotencyKey = (isRefund ? "REFUND:" : "PAY:") + platformId;
+            if (!HANDLED.add(idempotencyKey)) {
+                System.out.println(">>> 重复通知(" + idempotencyKey + ")，此前已处理，直接应答 success");
                 return "success";
             }
 
-            // ③ 业务核对（演示仅打印。生产必须：按 mchOrderNo 查本地订单存在、核对 amount 与本地一致，再按 state 处理）
-            int state = toInt(p.get("state"), -1); // form 形态下为字符串，统一归一化
-            System.out.println(">>> 订单 " + p.get("mchOrderNo") + " 金额(分)=" + p.get("amount")
-                    + " 状态=" + state + " (" + payStateText(state) + ")");
-            if (state == 2) {
-                System.out.println(">>> 支付成功 → 此处执行商户系统发货/记账逻辑（须先核对本地订单金额一致）");
-            } else {
-                System.out.println(">>> 非支付成功终态，按业务标记失败/关闭，不发货");
-            }
+            String action = isRefund
+                    ? (state == 2 ? "退款成功 → 此处更新本地退款单" : "退款失败 → 此处更新本地退款单失败状态")
+                    : "支付成功 → 此处执行发货/记账逻辑";
+            System.out.println(">>> " + action);
             return "success";
+        }
+
+        private static Map<String, Long> expectedAmounts(String envName) {
+            String raw = System.getenv(envName);
+            Map<String, Long> result = new LinkedHashMap<>();
+            if (raw == null || raw.isBlank()) return result;
+            for (String entry : raw.split(",")) {
+                int eq = entry.indexOf('=');
+                if (eq <= 0 || eq == entry.length() - 1) {
+                    throw new IllegalStateException(envName + " format must be businessNo=amountFen[,businessNo=amountFen]");
+                }
+                String businessNo = entry.substring(0, eq).trim();
+                long amount = Long.parseLong(entry.substring(eq + 1).trim());
+                if (businessNo.isEmpty() || amount < 0 || result.putIfAbsent(businessNo, amount) != null) {
+                    throw new IllegalStateException(envName + " contains invalid or duplicate business order");
+                }
+            }
+            return result;
+        }
+
+        private static boolean hasText(Object value) {
+            return value != null && !String.valueOf(value).isBlank() && !"null".equals(String.valueOf(value));
+        }
+
+        private static String requiredText(Map<String, Object> params, String field) {
+            Object value = params.get(field);
+            if (!hasText(value)) throw new IllegalArgumentException("missing notification field: " + field);
+            return String.valueOf(value);
+        }
+
+        private static long requiredLong(Map<String, Object> params, String field) {
+            String value = requiredText(params, field);
+            try {
+                return Long.parseLong(value);
+            } catch (NumberFormatException e) {
+                throw new IllegalArgumentException("invalid numeric notification field: " + field);
+            }
         }
 
         /** 兼容三种投递形态读取参数：URL queryString / POST form（默认） / POST JSON */

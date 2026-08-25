@@ -735,19 +735,25 @@ const generateSignature = (isVerification = false) => {
       content: JSON.stringify(params, null, 2)
     })
 
-    const sortedKeys = Object.keys(params).sort()
+    const sortedFragments = Object.keys(params)
+      .map(key => `${key}=${params[key]}&`)
+      .sort((left, right) => {
+        const a = left.toLowerCase()
+        const b = right.toLowerCase()
+        return a < b ? -1 : a > b ? 1 : 0
+      })
     steps.push({
-      title: '第二步: 按参数名ASCII码排序（字典序）',
-      content: `排序后的参数名: [${sortedKeys.join(', ')}]`
+      title: '第二步: 按完整 key=value& 片段排序（不区分大小写）',
+      content: `排序后的片段: [${sortedFragments.join(', ')}]`
     })
 
-    const stringA = sortedKeys.map(key => `${key}=${params[key]}`).join('&')
+    const stringA = sortedFragments.join('')
     steps.push({
       title: '第三步: 构建stringA（URL键值对格式）',
       content: stringA
     })
 
-    const stringSignTemp = `${stringA}&key=${formData.privateKey}`
+    const stringSignTemp = `${stringA}key=${formData.privateKey}`
     steps.push({
       title: '第四步: 在stringA最后拼接私钥',
       content: stringSignTemp
@@ -888,19 +894,25 @@ const verifySignature = (existingSign) => {
       content: JSON.stringify(params, null, 2)
     })
 
-    const sortedKeys = Object.keys(params).sort()
+    const sortedFragments = Object.keys(params)
+      .map(key => `${key}=${params[key]}&`)
+      .sort((left, right) => {
+        const a = left.toLowerCase()
+        const b = right.toLowerCase()
+        return a < b ? -1 : a > b ? 1 : 0
+      })
     steps.push({
-      title: '第二步: 按参数名ASCII码排序（字典序）',
-      content: `排序后的参数名: [${sortedKeys.join(', ')}]`
+      title: '第二步: 按完整 key=value& 片段排序（不区分大小写）',
+      content: `排序后的片段: [${sortedFragments.join(', ')}]`
     })
 
-    const stringA = sortedKeys.map(key => `${key}=${params[key]}`).join('&')
+    const stringA = sortedFragments.join('')
     steps.push({
       title: '第三步: 构建stringA（URL键值对格式）',
       content: stringA
     })
 
-    const stringSignTemp = `${stringA}&key=${formData.privateKey}`
+    const stringSignTemp = `${stringA}key=${formData.privateKey}`
     steps.push({
       title: '第四步: 在stringA最后拼接私钥',
       content: stringSignTemp
@@ -1493,4 +1505,4 @@ const onApiTypeChange = () => {
   color: #D8000C;
   font-weight: bold;
 }
-</style> 
+</style>

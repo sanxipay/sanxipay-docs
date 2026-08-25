@@ -692,22 +692,28 @@
                     content: JSON.stringify(params, null, 2)
                 });
 
-                // Step 2: 参数排序
-                const sortedKeys = Object.keys(params).sort();
+                // Step 2: 对完整 key=value& 片段做不区分大小写排序（与服务端一致）
+                const sortedFragments = Object.keys(params)
+                    .map(key => `${key}=${params[key]}&`)
+                    .sort((left, right) => {
+                        const a = left.toLowerCase();
+                        const b = right.toLowerCase();
+                        return a < b ? -1 : a > b ? 1 : 0;
+                    });
                 steps.push({
-                    title: '第二步: 按参数名ASCII码排序（字典序）',
-                    content: `排序后的参数名: [${sortedKeys.join(', ')}]`
+                    title: '第二步: 按完整 key=value& 片段排序（不区分大小写）',
+                    content: `排序后的片段: [${sortedFragments.join(', ')}]`
                 });
 
                 // Step 3: 构建stringA
-                const stringA = sortedKeys.map(key => `${key}=${params[key]}`).join('&');
+                const stringA = sortedFragments.join('');
                 steps.push({
                     title: '第三步: 构建stringA（URL键值对格式）',
                     content: stringA
                 });
 
                 // Step 4: 拼接私钥
-                const stringSignTemp = `${stringA}&key=${privateKey}`;
+                const stringSignTemp = `${stringA}key=${privateKey}`;
                 steps.push({
                     title: '第四步: 在stringA最后拼接私钥',
                     content: stringSignTemp
